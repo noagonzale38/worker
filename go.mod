@@ -13,7 +13,7 @@ require (
 	cloud.google.com/go/profiler v0.4.2
 	github.com/TicketsBot-cloud/archiverclient v0.0.0-20250514201416-cf23f65eb3fc
 	github.com/TicketsBot-cloud/common v0.0.0-20250509064208-a2d357175463
-	github.com/TicketsBot-cloud/database v0.0.0-20250320215455-17762cd7d39a
+	github.com/TicketsBot-cloud/database v0.0.0-20250531143059-5bc8d5b02650
 	github.com/TicketsBot-cloud/gdl v0.0.0-20250509054940-2045fbe19c06
 	github.com/TicketsBot/analytics-client v0.0.0-20240724103359-30f5dac821e6
 	github.com/caarlos0/env/v10 v10.0.0
