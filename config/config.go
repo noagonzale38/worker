@@ -30,11 +30,11 @@ type (
 
 		Bot struct {
 			HttpAddress         string   `env:"HTTP_ADDR"`
-			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.ticketsbot.cloud"`
-			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://ticketsbot.cloud"`
-			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.ticketsbot.cloud"`
-			PoweredBy           string   `env:"POWEREDBY" envDefault:"ticketsbot.cloud"`
-			IconUrl             string   `env:"ICON_URL" envDefault:"https://ticketsbot.cloud/assets/img/logo.png"`
+			DashboardUrl        string   `env:"DASHBOARD_URL" envDefault:"https://dashboard.tickets.bot"`
+			FrontpageUrl        string   `env:"FRONTPAGE_URL" envDefault:"https://tickets.bot"`
+			VoteUrl             string   `env:"VOTE_URL" envDefault:"https://vote.tickets.bot"`
+			PoweredBy           string   `env:"POWEREDBY" envDefault:"tickets.bot"`
+			IconUrl             string   `env:"ICON_URL" envDefault:"https://tickets.bot/assets/img/logo.png"`
 			SupportServerInvite string   `env:"SUPPORT_SERVER_INVITE" envDefault:"https://discord.gg/ticketsbot"`
 			Admins              []uint64 `env:"WORKER_BOT_ADMINS"`
 			Helpers             []uint64 `env:"WORKER_BOT_HELPERS"`
