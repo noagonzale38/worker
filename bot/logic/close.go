@@ -11,6 +11,7 @@ import (
 	"github.com/TicketsBot-cloud/common/permission"
 	"github.com/TicketsBot-cloud/common/sentry"
 	"github.com/TicketsBot-cloud/database"
+	"github.com/TicketsBot-cloud/gdl/objects/channel/embed"
 	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
 	"github.com/TicketsBot-cloud/gdl/objects/member"
 	"github.com/TicketsBot-cloud/gdl/rest"
@@ -19,7 +20,6 @@ import (
 	"github.com/TicketsBot-cloud/worker/bot/customisation"
 	"github.com/TicketsBot-cloud/worker/bot/dbclient"
 	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
-	"github.com/TicketsBot-cloud/worker/bot/model"
 	"github.com/TicketsBot-cloud/worker/bot/redis"
 	"github.com/TicketsBot-cloud/worker/bot/utils"
 	"github.com/TicketsBot-cloud/worker/i18n"
@@ -108,14 +108,6 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 					}
 				}
 
-				if errors.As(restError, &restError) && restError.StatusCode == http.StatusTooManyRequests {
-					// If we hit a ratelimit, we should try to get this chunk again in 1 second
-					if lastChunkSize == limit {
-						time.Sleep(time.Second)
-						continue
-					}
-				}
-
 				cmd.HandleError(err)
 				return
 			}
@@ -183,10 +175,11 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 		if reason == nil {
 			cmd.ReplyPermanent(customisation.Green, i18n.TitleTicketClosed, i18n.MessageCloseSuccess, cmd.UserId())
 		} else {
-			fields := []model.Field{
+			fields := []embed.EmbedField{
 				{
-					Name:  cmd.GetMessage(i18n.Reason),
-					Value: fmt.Sprintf("```%s```", *reason),
+					Name:   cmd.GetMessage(i18n.Reason),
+					Value:  fmt.Sprintf("```%s```", *reason),
+					Inline: false,
 				},
 			}
 
@@ -264,11 +257,11 @@ func sendCloseEmbed(ctx context.Context, cmd registry.CommandContext, errorConte
 			},
 		}
 
-		closeContainer := BuildCloseContainer(ctx, cmd, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
+		closeEmbed, closeComponents := BuildCloseEmbed(ctx, cmd.Worker(), ticket, member.User.Id, reason, nil, componentBuilders)
 
 		data := rest.CreateMessageData{
-			Flags:      uint(message.FlagComponentsV2),
-			Components: utils.Slice(*closeContainer),
+			Embeds:     utils.Slice(closeEmbed),
+			Components: closeComponents,
 		}
 
 		msg, err := cmd.Worker().CreateMessageComplex(*archiveChannelId, data)
