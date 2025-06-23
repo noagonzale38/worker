@@ -108,6 +108,14 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 					}
 				}
 
+				if errors.As(restError, &restError) && restError.StatusCode == http.StatusTooManyRequests {
+					// If we hit a ratelimit, we should try to get this chunk again in 1 second
+					if lastChunkSize == limit {
+						time.Sleep(time.Second)
+						continue
+					}
+				}
+
 				cmd.HandleError(err)
 				return
 			}
