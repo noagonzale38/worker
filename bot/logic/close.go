@@ -93,6 +93,8 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 
 		lastId := uint64(0)
 		lastChunkSize := limit
+
+		retries := 0
 		for lastChunkSize == limit {
 			chunk, err := cmd.Worker().GetChannelMessages(cmd.ChannelId(), rest.GetChannelMessagesData{
 				Before: lastId,
@@ -100,18 +102,16 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 			})
 
 			if err != nil {
-				// First rest interaction, check for 403
 				var restError request.RestError
-				if errors.As(restError, &restError) && restError.StatusCode == 403 {
+				if errors.As(err, &restError) && restError.StatusCode == 403 {
 					if err := dbclient.Client.AutoCloseExclude.ExcludeAll(ctx, cmd.GuildId()); err != nil {
 						sentry.ErrorWithContext(err, errorContext)
 					}
 				}
 
-				if errors.As(restError, &restError) && restError.StatusCode == http.StatusTooManyRequests {
-					// If we hit a ratelimit, we should try to get this chunk again in 1 second
-					if lastChunkSize == limit {
-						time.Sleep(time.Second)
+				if errors.As(err, &restError) && restError.StatusCode == http.StatusTooManyRequests {
+					if retries < 5 {
+						retries++
 						continue
 					}
 				}
@@ -120,6 +120,7 @@ func CloseTicket(ctx context.Context, cmd registry.CommandContext, reason *strin
 				return
 			}
 
+			retries = 0 // reset retries after a successful call
 			lastChunkSize = len(chunk)
 
 			if lastChunkSize > 0 {
