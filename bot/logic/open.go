@@ -8,28 +8,28 @@ import (
 	"strings"
 	"time"
 
-	permcache "github.com/TicketsBot-cloud/common/permission"
-	"github.com/TicketsBot-cloud/common/premium"
-	"github.com/TicketsBot-cloud/common/sentry"
-	"github.com/TicketsBot-cloud/database"
-	"github.com/TicketsBot-cloud/gdl/objects/channel"
-	"github.com/TicketsBot-cloud/gdl/objects/channel/message"
-	"github.com/TicketsBot-cloud/gdl/objects/interaction/component"
-	"github.com/TicketsBot-cloud/gdl/objects/member"
-	"github.com/TicketsBot-cloud/gdl/objects/user"
-	"github.com/TicketsBot-cloud/gdl/permission"
-	"github.com/TicketsBot-cloud/gdl/rest"
-	"github.com/TicketsBot-cloud/gdl/rest/request"
-	"github.com/TicketsBot-cloud/worker"
-	"github.com/TicketsBot-cloud/worker/bot/command"
-	"github.com/TicketsBot-cloud/worker/bot/command/registry"
-	"github.com/TicketsBot-cloud/worker/bot/customisation"
-	"github.com/TicketsBot-cloud/worker/bot/dbclient"
-	"github.com/TicketsBot-cloud/worker/bot/metrics/prometheus"
-	"github.com/TicketsBot-cloud/worker/bot/metrics/statsd"
-	"github.com/TicketsBot-cloud/worker/bot/redis"
-	"github.com/TicketsBot-cloud/worker/bot/utils"
-	"github.com/TicketsBot-cloud/worker/i18n"
+	permcache "github.com/TicketsBot/common/permission"
+	"github.com/TicketsBot/common/premium"
+	"github.com/TicketsBot/common/sentry"
+	"github.com/TicketsBot/database"
+	"github.com/TicketsBot/worker"
+	"github.com/TicketsBot/worker/bot/command"
+	"github.com/TicketsBot/worker/bot/command/registry"
+	"github.com/TicketsBot/worker/bot/customisation"
+	"github.com/TicketsBot/worker/bot/dbclient"
+	"github.com/TicketsBot/worker/bot/metrics/prometheus"
+	"github.com/TicketsBot/worker/bot/metrics/statsd"
+	"github.com/TicketsBot/worker/bot/redis"
+	"github.com/TicketsBot/worker/bot/utils"
+	"github.com/TicketsBot/worker/i18n"
+	"github.com/rxdn/gdl/objects/channel"
+	"github.com/rxdn/gdl/objects/channel/message"
+	"github.com/rxdn/gdl/objects/interaction/component"
+	"github.com/rxdn/gdl/objects/member"
+	"github.com/rxdn/gdl/objects/user"
+	"github.com/rxdn/gdl/permission"
+	"github.com/rxdn/gdl/rest"
+	"github.com/rxdn/gdl/rest/request"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -273,7 +273,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 	}
 
 	span = sentry.StartSpan(rootSpan.Context(), "Generate channel name")
-	name, err := GenerateChannelName(ctx, cmd.Worker(), panel, cmd.GuildId(), ticketId, cmd.UserId(), nil)
+	name, err := GenerateChannelName(ctx, cmd, panel, ticketId, cmd.UserId(), nil)
 	if err != nil {
 		cmd.HandleError(err)
 		return database.Ticket{}, err
@@ -308,7 +308,7 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 			span := sentry.StartSpan(rootSpan.Context(), "Send message to ticket notification channel")
 
 			buildSpan := sentry.StartSpan(span.Context(), "Build ticket notification message")
-			data := BuildJoinThreadMessage(ctx, cmd.Worker(), cmd.GuildId(), cmd.UserId(), name, ticketId, panel, nil, cmd.PremiumTier())
+			data := BuildJoinThreadMessage(ctx, cmd.Worker(), cmd.GuildId(), cmd.UserId(), ticketId, panel, nil, cmd.PremiumTier())
 			buildSpan.Finish()
 
 			// TODO: Check if channel exists
@@ -444,116 +444,108 @@ func OpenTicket(ctx context.Context, cmd registry.InteractionContext, panel *dat
 
 	// Send mentions
 	group.Go(func() error {
-		span := sentry.StartSpan(rootSpan.Context(), "Load guild metadata from database")
-		metadata, err := dbclient.Client.GuildMetadata.Get(ctx, cmd.GuildId())
-		span.Finish()
-		if err != nil {
-			return err
-		}
-
-		// mentions
-		var content string
-
-		// Append on-call role pings
-		if isThread {
-			if panel == nil {
-				if metadata.OnCallRole != nil {
-					content += fmt.Sprintf("<@&%d>", *metadata.OnCallRole)
-				}
-			} else {
-				if panel.WithDefaultTeam && metadata.OnCallRole != nil {
-					content += fmt.Sprintf("<@&%d>", *metadata.OnCallRole)
-				}
-
-				span := sentry.StartSpan(rootSpan.Context(), "Get teams from database")
-				teams, err := dbclient.Client.PanelTeams.GetTeams(ctx, panel.PanelId)
-				span.Finish()
-				if err != nil {
-					return err
-				} else {
-					for _, team := range teams {
-						if team.OnCallRole != nil {
-							content += fmt.Sprintf("<@&%d>", *team.OnCallRole)
-						}
-					}
-				}
-			}
-		}
-
-		if panel != nil {
-			// roles
-			span := sentry.StartSpan(rootSpan.Context(), "Get panel role mentions from database")
-			roles, err := dbclient.Client.PanelRoleMentions.GetRoles(ctx, panel.PanelId)
-			span.Finish()
-			if err != nil {
-				return err
-			} else {
-				for _, roleId := range roles {
-					if roleId == cmd.GuildId() {
-						content += "@everyone"
-					} else {
-						content += fmt.Sprintf("<@&%d>", roleId)
-					}
-				}
-			}
-
-			// user
-			span = sentry.StartSpan(rootSpan.Context(), "Get panel user mention setting from database")
-			shouldMentionUser, err := dbclient.Client.PanelUserMention.ShouldMentionUser(ctx, panel.PanelId)
-			span.Finish()
-			if err != nil {
-				return err
-			} else {
-				if shouldMentionUser {
-					content += fmt.Sprintf("<@%d>", cmd.UserId())
-				}
-			}
-
-			// here
-			span = sentry.StartSpan(rootSpan.Context(), "Get panel here mention setting from database")
-			shouldMentionHere, err := dbclient.Client.PanelHereMention.ShouldMentionHere(ctx, panel.PanelId)
-			span.Finish()
-			if err != nil {
-				return err
-			} else {
-				if shouldMentionHere {
-					content += "@here"
-				}
-			}
-		}
-
-		if content != "" {
-			content = fmt.Sprintf("-# ||%s||", content)
-			if len(content) > 2000 {
-				content = content[:2000]
-			}
-
-			span := sentry.StartSpan(rootSpan.Context(), "Send ping message")
-			msg, err := cmd.Worker().CreateMessageComplex(ch.Id, rest.CreateMessageData{
-				Content: content,
-				AllowedMentions: message.AllowedMention{
-					Parse: []message.AllowedMentionType{
-						message.EVERYONE,
-						message.USERS,
-						message.ROLES,
-					},
-				},
-			})
-			span.Finish()
-
-			if err != nil {
-				return err
-			}
-
-			if panel != nil && panel.DeleteMentions {
-				span = sentry.StartSpan(rootSpan.Context(), "Delete ping message")
-				_ = cmd.Worker().DeleteMessage(ch.Id, msg.Id)
-				span.Finish()
-			}
-		}
-
-		return nil
+	    span := sentry.StartSpan(rootSpan.Context(), "Load guild metadata from database")
+	    metadata, err := dbclient.Client.GuildMetadata.Get(ctx, cmd.GuildId())
+	    span.Finish()
+	    if err != nil {
+	        return err
+	    }
+	
+	    // mentions
+	    var content string
+	
+	    // Append on-call role pings
+	    if isThread {
+	        if panel == nil {
+	            if metadata.OnCallRole != nil {
+	                content += fmt.Sprintf("<@&%d>", *metadata.OnCallRole)
+	            }
+	        } else {
+	            if panel.WithDefaultTeam && metadata.OnCallRole != nil {
+	                content += fmt.Sprintf("<@&%d>", *metadata.OnCallRole)
+	            }
+	
+	            span := sentry.StartSpan(rootSpan.Context(), "Get teams from database")
+	            teams, err := dbclient.Client.PanelTeams.GetTeams(ctx, panel.PanelId)
+	            span.Finish()
+	            if err != nil {
+	                return err
+	            } else {
+	                for _, team := range teams {
+	                    if team.OnCallRole != nil {
+	                        content += fmt.Sprintf("<@&%d>", *team.OnCallRole)
+	                    }
+	                }
+	            }
+	        }
+	    }
+	
+	    if panel != nil {
+	        // roles
+	        span := sentry.StartSpan(rootSpan.Context(), "Get panel role mentions from database")
+	        roles, err := dbclient.Client.PanelRoleMentions.GetRoles(ctx, panel.PanelId)
+	        span.Finish()
+	        if err != nil {
+	            return err
+	        } else {
+	            for _, roleId := range roles {
+	                if roleId == cmd.GuildId() {
+	                    content += "@everyone"
+	                } else {
+	                    content += fmt.Sprintf("<@&%d>", roleId)
+	                }
+	            }
+	        }
+	
+	        // user
+	        span = sentry.StartSpan(rootSpan.Context(), "Get panel user mention setting from database")
+	        shouldMentionUser, err := dbclient.Client.PanelUserMention.ShouldMentionUser(ctx, panel.PanelId)
+	        span.Finish()
+	        if err != nil {
+	            return err
+	        } else {
+	            if shouldMentionUser {
+	                content += fmt.Sprintf("<@%d>", cmd.UserId())
+	            }
+	        }
+	    }
+	
+	    if content != "" {
+	        content = fmt.Sprintf("-# ||%s||", content)
+	        if len(content) > 2000 {
+	            content = content[:2000]
+	        }
+	
+	        span := sentry.StartSpan(rootSpan.Context(), "Send ping message")
+	        pingMessage, err := cmd.Worker().CreateMessageComplex(ch.Id, rest.CreateMessageData{
+	            Content: content,
+	            AllowedMentions: message.AllowedMention{
+	                Parse: []message.AllowedMentionType{
+	                    message.EVERYONE,
+	                    message.USERS,
+	                    message.ROLES,
+	                },
+	            },
+	        })
+	        span.Finish()
+	
+	        if err != nil {
+	            return err
+	        }
+	
+	        // Delete the ping message
+	        span = sentry.StartSpan(rootSpan.Context(), "Delete ping message")
+	        err = cmd.Worker().DeleteMessage(ch.Id, pingMessage.Id)
+	        span.Finish()
+	
+	        if err != nil {
+	            return err
+	        }
+	    }
+	
+	    return nil
 	})
+
 
 	// Create webhook
 	// TODO: Create webhook on use, rather than on ticket creation.
@@ -939,20 +931,25 @@ func GetIntegrationRoleId(rootCtx context.Context, worker *worker.Context, guild
 	return nil, nil
 }
 
-func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *database.Panel, guildId uint64, ticketId int, openerId uint64, claimer *uint64) (string, error) {
+func GenerateChannelName(ctx context.Context, cmd registry.CommandContext, panel *database.Panel, ticketId int, openerId uint64, claimer *uint64) (string, error) {
 	// Create ticket name
 	var name string
 
 	// Use server default naming scheme
 	if panel == nil || panel.NamingScheme == nil {
-		namingScheme, err := dbclient.Client.NamingScheme.Get(ctx, guildId)
+		namingScheme, err := dbclient.Client.NamingScheme.Get(ctx, cmd.GuildId())
 		if err != nil {
 			return "", err
 		}
 
-		strTicket := strings.ToLower(i18n.GetMessageFromGuild(guildId, i18n.Ticket))
+		strTicket := strings.ToLower(cmd.GetMessage(i18n.Ticket))
 		if namingScheme == database.Username {
-			user, err := worker.GetUser(openerId)
+			var user user.User
+			if cmd.UserId() == openerId {
+				user, err = cmd.User()
+			} else {
+				user, err = cmd.Worker().GetUser(openerId)
+			}
 
 			if err != nil {
 				return "", err
@@ -964,7 +961,7 @@ func GenerateChannelName(ctx context.Context, worker *worker.Context, panel *dat
 		}
 	} else {
 		var err error
-		name, err = doSubstitutions(worker, *panel.NamingScheme, openerId, guildId, []Substitutor{
+		name, err = doSubstitutions(cmd, *panel.NamingScheme, openerId, []Substitutor{
 			// %id%
 			NewSubstitutor("id", false, false, func(user user.User, member member.Member) string {
 				return strconv.Itoa(ticketId)
@@ -1030,26 +1027,24 @@ func BuildJoinThreadMessage(
 	ctx context.Context,
 	worker *worker.Context,
 	guildId, openerId uint64,
-	name string,
 	ticketId int,
 	panel *database.Panel,
 	staffMembers []uint64,
 	premiumTier premium.PremiumTier,
 ) command.MessageResponse {
-	return buildJoinThreadMessage(ctx, worker, guildId, openerId, name, ticketId, panel, staffMembers, premiumTier, false)
+	return buildJoinThreadMessage(ctx, worker, guildId, openerId, ticketId, panel, staffMembers, premiumTier, false)
 }
 
 func BuildThreadReopenMessage(
 	ctx context.Context,
 	worker *worker.Context,
 	guildId, openerId uint64,
-	name string,
 	ticketId int,
 	panel *database.Panel,
 	staffMembers []uint64,
 	premiumTier premium.PremiumTier,
 ) command.MessageResponse {
-	return buildJoinThreadMessage(ctx, worker, guildId, openerId, name, ticketId, panel, staffMembers, premiumTier, true)
+	return buildJoinThreadMessage(ctx, worker, guildId, openerId, ticketId, panel, staffMembers, premiumTier, true)
 }
 
 // TODO: Translations
@@ -1057,7 +1052,6 @@ func buildJoinThreadMessage(
 	ctx context.Context,
 	worker *worker.Context,
 	guildId, openerId uint64,
-	name string,
 	ticketId int,
 	panel *database.Panel,
 	staffMembers []uint64,
@@ -1081,7 +1075,7 @@ func buildJoinThreadMessage(
 		title = "Ticket Reopened"
 	}
 
-	e := utils.BuildEmbedRaw(customisation.GetColourOrDefault(ctx, guildId, colour), title, fmt.Sprintf("%s with ID: %d has been opened. Press the button below to join it.", name, ticketId), nil, premiumTier)
+	e := utils.BuildEmbedRaw(customisation.GetColourOrDefault(ctx, guildId, colour), title, "A ticket has been opened. Press the button below to join it.", nil, premiumTier)
 	e.AddField(customisation.PrefixWithEmoji("Opened By", customisation.EmojiOpen, !worker.IsWhitelabel), customisation.PrefixWithEmoji(fmt.Sprintf("<@%d>", openerId), customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
 	e.AddField(customisation.PrefixWithEmoji("Panel", customisation.EmojiPanel, !worker.IsWhitelabel), customisation.PrefixWithEmoji(panelName, customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
 	e.AddField(customisation.PrefixWithEmoji("Staff In Ticket", customisation.EmojiStaff, !worker.IsWhitelabel), customisation.PrefixWithEmoji(strconv.Itoa(len(staffMembers)), customisation.EmojiBulletLine, !worker.IsWhitelabel), true)
