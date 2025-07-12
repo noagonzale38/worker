@@ -3,9 +3,8 @@ package customisation
 import (
 	"fmt"
 
-	"github.com/TicketsBot-cloud/worker/config"
-	"github.com/TicketsBot-cloud/gdl/objects"
-	"github.com/TicketsBot-cloud/gdl/objects/guild/emoji"
+	"github.com/rxdn/gdl/objects"
+	"github.com/rxdn/gdl/objects/guild/emoji"
 )
 
 type CustomEmoji struct {
@@ -38,22 +37,22 @@ func (e CustomEmoji) BuildEmoji() *emoji.Emoji {
 }
 
 var (
-	EmojiId         = NewCustomEmoji("id", config.Conf.Emojis.Id, false)
-	EmojiOpen       = NewCustomEmoji("open", config.Conf.Emojis.Open, false)
-	EmojiOpenTime   = NewCustomEmoji("opentime", config.Conf.Emojis.OpenTime, false)
-	EmojiClose      = NewCustomEmoji("close", config.Conf.Emojis.Close, false)
-	EmojiCloseTime  = NewCustomEmoji("closetime", config.Conf.Emojis.CloseTime, false)
-	EmojiReason     = NewCustomEmoji("reason", config.Conf.Emojis.Reason, false)
-	EmojiSubject    = NewCustomEmoji("subject", config.Conf.Emojis.Subject, false)
-	EmojiTranscript = NewCustomEmoji("transcript", config.Conf.Emojis.Transcript, false)
-	EmojiClaim      = NewCustomEmoji("claim", config.Conf.Emojis.Claim, false)
-	EmojiPanel      = NewCustomEmoji("panel", config.Conf.Emojis.Panel, false)
-	EmojiRating     = NewCustomEmoji("rating", config.Conf.Emojis.Rating, false)
-	EmojiStaff      = NewCustomEmoji("staff", config.Conf.Emojis.Staff, false)
-	EmojiThread     = NewCustomEmoji("thread", config.Conf.Emojis.Thread, false)
-	EmojiBulletLine = NewCustomEmoji("bulletline", config.Conf.Emojis.BulletLine, false)
-	EmojiPatreon    = NewCustomEmoji("patreon", config.Conf.Emojis.Patreon, false)
-	EmojiDiscord    = NewCustomEmoji("discord", config.Conf.Emojis.Discord, false)
+	EmojiId         = NewCustomEmoji("ticketID", 1342682254274596904, false)
+	EmojiOpen       = NewCustomEmoji("open", 1342682257831497760, false)
+	EmojiOpenTime   = NewCustomEmoji("time", 1342682259018223637, false)
+	EmojiClose      = NewCustomEmoji("close", 1342682256728264816, false)
+	EmojiCloseTime  = NewCustomEmoji("time", 1342682259018223637, false)
+	EmojiReason     = NewCustomEmoji("reason", 1342682259974787112, false)
+	EmojiSubject    = NewCustomEmoji("subject", 1327350205896458251, false)
+	EmojiTranscript = NewCustomEmoji("transcripts", 1342688904393916488, false)
+	EmojiClaim      = NewCustomEmoji("claimedby", 1342682255587278969, false)
+	EmojiPanel      = NewCustomEmoji("panel", 1306922982815301673, false)
+	EmojiRating     = NewCustomEmoji("rating", 1342688907325734954, false)
+	EmojiStaff      = NewCustomEmoji("support", 1342688908902797323, false)
+	EmojiThread     = NewCustomEmoji("ticketThread", 1342688905987756042, false)
+	EmojiBulletLine = NewCustomEmoji("arrowRight", 1342688910211547217, false)
+	EmojiPatreon    = NewCustomEmoji("patreon", 1342688911729758250, false)
+	EmojiDiscord    = NewCustomEmoji("discord", 1342688913214672977, false)
 	//EmojiTime       = NewCustomEmoji("time", 974006684622159952, false)
 )
 
