@@ -73,6 +73,8 @@ func (m *ComponentInteractionManager) RegisterCommands() {
 		new(handlers.JoinThreadHandler),
 		new(handlers.OpenSurveyHandler),
 		new(handlers.PanelHandler),
+		new(handlers.PreTicketProceedHandler),
+		new(handlers.PreTicketRejectHandler),
 		new(handlers.PremiumCheckAgain),
 		new(handlers.PremiumKeyButtonHandler),
 		new(handlers.RateHandler),

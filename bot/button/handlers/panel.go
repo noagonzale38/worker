@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/TicketsBot-cloud/common/sentry"
@@ -55,39 +54,7 @@ func (h *PanelHandler) Execute(ctx *context.ButtonContext) {
 			return
 		}
 
-		if panel.FormId == nil {
-			_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
-		} else {
-			form, ok, err := dbclient.Client.Forms.Get(ctx, *panel.FormId)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			if !ok {
-				ctx.HandleError(errors.New("Form not found"))
-				return
-			}
-
-			inputs, err := dbclient.Client.FormInput.GetInputs(ctx, form.Id)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			inputOptions, err := dbclient.Client.FormInputOption.GetOptionsByForm(ctx, form.Id)
-			if err != nil {
-				ctx.HandleError(err)
-				return
-			}
-
-			if len(inputs) == 0 { // Don't open a blank form
-				_, _ = logic.OpenTicket(ctx.Context, ctx, &panel, panel.Title, nil, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
-			} else {
-				modal := buildForm(panel, form, inputs, inputOptions)
-				ctx.Modal(modal)
-			}
-		}
+		startPanelFlow(ctx, panel, outOfHoursTitle, outOfHoursWarning, outOfHoursColour)
 
 		return
 	}
