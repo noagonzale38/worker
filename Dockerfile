@@ -6,6 +6,11 @@ RUN go version
 RUN apt-get update && apt-get upgrade -y && apt-get install -y ca-certificates git zlib1g-dev
 
 COPY . /go/src/github.com/TicketsBot-cloud/worker
+
+# go.mod replaces github.com/TicketsBot-cloud/database with ../database;
+# provide it via: docker buildx build --build-context database=../database
+COPY --from=database / /go/src/github.com/TicketsBot-cloud/database
+
 WORKDIR /go/src/github.com/TicketsBot-cloud/worker
 
 RUN git submodule update --init --recursive --remote
@@ -14,7 +19,10 @@ RUN set -Eeux && \
     go mod download && \
     go mod verify
 
-RUN GOOS=linux GOARCH=amd64 \
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build \
     -tags=jsoniter \
     -trimpath \
